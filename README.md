@@ -21,6 +21,9 @@ ed25519 you use. However, it has an optional dependency on
 [ed25519-dalek][dalek] which provides a slightly nicer API using the types from
 that library.
 
+Thanks to isis lovecruft and Henry de Valence for assistance with the dalek API
+and understanding the OpenPGP specification.
+
 ## Demonstration
 
 The "print" example prints an ASCII armored OpenPGP public key to stdout; you
