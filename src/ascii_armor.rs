@@ -3,6 +3,21 @@ use std::fmt;
 use base64;
 use byteorder::{BigEndian, ByteOrder};
 
+pub fn remove_ascii_armor(s: &str) -> Option<Vec<u8>> {
+    let lines: Vec<&str> = s.lines().map(|s| s.trim()).collect();
+    let first_line = lines.first()?;
+    if !first_line.starts_with("-----") || !first_line.ends_with("-----") {
+        return None
+    }
+    let last_line = lines.last()?;
+    if !last_line.starts_with("-----") || !last_line.ends_with("-----") {
+        return None
+    }
+
+    base64::decode(&lines[2..lines.len() - 2].concat()).ok()
+    // TODO checksum?
+}
+
 pub fn ascii_armor(
     header: &'static str,
     footer: &'static str,

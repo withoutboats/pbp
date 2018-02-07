@@ -3,18 +3,13 @@ use std::ops::Range;
 use std::u16;
 
 use byteorder::{ByteOrder, BigEndian};
-use digest::{Input, FixedOutput};
 use sha1::Sha1;
-use sha2::Sha256;
 
-use ascii_armor::ascii_armor;
+use ascii_armor::{ascii_armor, remove_ascii_armor};
+use packet::*;
 
-/// An OpenPGP public key fingerprint.
-pub type Fingerprint = [u8; 20];
-type BigEndianU32  = [u8; 4];
-type BigEndianU16  = [u8; 2];
-
-const TIMESTAMP: [u8; 4] = [0, 0, 0, 1];
+use {Fingerprint, Signature};
+use {PgpSig, SubPacket, SigType};
 
 // curve identifier (curve25519)
 const CURVE: &[u8] = &[
@@ -65,7 +60,7 @@ impl PgpKey {
         user_id: &str,
         sign: F,
     ) -> PgpKey where
-        F: Fn(&[u8]) -> [u8; 64]
+        F: Fn(&[u8]) -> Signature
     {
         assert!(key.len() == 32);
 
@@ -75,21 +70,25 @@ impl PgpKey {
         let fingerprint = fingerprint(&data[key_packet_range.clone()]);
         write_user_id_packet(&mut data, user_id);
 
-        let signature_packet = signature_packet(
-            &data[key_packet_range],
-            user_id,
+        let sig_data = {
+            let mut data = Vec::from(&data[key_packet_range]);
+            data.extend(&[0xb4]);
+            data.extend(&bigendian_u32(user_id.len() as u32));
+            data.extend(user_id.as_bytes());
+            data
+        };
+
+        let signature_packet = PgpSig::new(
+            &sig_data,
             fingerprint,
+            SigType::PositiveCertification,
+            &[SubPacket { tag: 27, data: &[0] }],
             sign,
         );
-
-        data.extend(&signature_packet);
+        
+        data.extend(signature_packet.as_bytes());
 
         PgpKey { data }
-    }
-
-    /// The ed25519 public key data contained in this key.
-    pub fn key_data(&self) -> &[u8] {
-        &self.data[22..54]
     }
 
     /// Construct a PgpKey struct from an OpenPGP public key.
@@ -119,6 +118,20 @@ impl PgpKey {
 
             Some(PgpKey { data })
         } else { None } 
+    }
+
+    pub fn from_ascii_armor(string: &str) -> Option<PgpKey> {
+        let data = remove_ascii_armor(string)?;
+        PgpKey::from_bytes(&data)
+    }
+
+    /// The ed25519 public key data contained in this key.
+    pub fn key_data(&self) -> &[u8] {
+        &self.data[22..54]
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.data[..]
     }
 
     /// The OpenPGP fingerprint of this public key.
@@ -174,105 +187,8 @@ fn write_user_id_packet(data: &mut Vec<u8>, user_id: &str) -> Range<usize> {
     write_packet(data, 13, |packet| packet.extend(user_id.as_bytes()))
 }
 
-fn signature_packet<F>(
-    key_packet: &[u8],
-    user_id: &str,
-    fingerprint: Fingerprint,
-    sign: F,
-) -> Vec<u8> where
-    F: Fn(&[u8]) -> [u8; 64],
-{
-    prepare_packet(2, |packet| {
-        packet.push(4);     // version number
-        packet.push(0x13);  // signature class
-        packet.push(22);    // signing algorithm (EdDSA)
-        packet.push(8);     // hash algorithm (SHA-256)
-
-        write_subpackets(packet, |hashed_subpackets| {
-            write_single_subpacket(hashed_subpackets, 33, |packet| {
-                packet.push(4);
-                packet.extend(&fingerprint);
-            });
-
-            write_single_subpacket(hashed_subpackets, 2, |packet| packet.extend(&TIMESTAMP));
-
-            // key flags
-            write_single_subpacket(hashed_subpackets, 27, |packet| packet.extend(&[0]));
-        });
-
-        let hash = {
-            let mut hasher = Sha256::default();
-
-            hasher.process(key_packet);
-
-            hasher.process(&[0xb4]);
-            hasher.process(&bigendian_u32(user_id.len() as u32));
-            hasher.process(user_id.as_bytes());
-
-            hasher.process(&packet[3..]);
-
-            hasher.process(&[0x04, 0xff]);
-            hasher.process(&bigendian_u32((packet.len() - 3) as u32));
-
-            hasher.fixed_result()
-        };
-
-        write_subpackets(packet, |unhashed_subpackets| {
-            write_single_subpacket(unhashed_subpackets, 16, |packet| {
-                packet.extend(&fingerprint[12..]);
-            });
-        });
-
-        packet.extend(&hash[0..2]);
-
-        let signature = sign(&hash[..]);
-        write_mpi(packet, &signature[00..32]);
-        write_mpi(packet, &signature[32..64]);
-    })
-}
-
-fn write_packet<F: Fn(&mut Vec<u8>)>(data: &mut Vec<u8>, tag: u8, write: F) -> Range<usize> {
-    let init = data.len();
-    let header_tag = (tag << 2) | 0b_1000_0001;
-    data.extend(&[header_tag, 0, 0]);
-    write(data);
-    let len = data.len() - init - 3;
-    assert!(len < u16::MAX as usize);
-    BigEndian::write_u16(&mut data[(init+1)..(init+3)], len as u16);
-    init..data.len()
-}
-
-fn prepare_packet<F: Fn(&mut Vec<u8>)>(tag: u8, write: F) -> Vec<u8> {
-    let mut packet = vec![0, 0, 0];
-    write(&mut packet);
-    packet[0] = (tag << 2) | 0b_1000_0001;
-    let len = packet.len() - 3;
-    BigEndian::write_u16(&mut packet[1..3], len as u16);
-    packet
-}
-
-fn write_subpackets<F>(packet: &mut Vec<u8>, write_each_subpacket: F) where
-    F: Fn(&mut Vec<u8>)
-{
-    packet.extend(&[0, 0]);
-    let init = packet.len();
-    write_each_subpacket(packet);
-    let len = packet.len() - init;
-    assert!(len < u16::MAX as usize);
-    BigEndian::write_u16(&mut packet[(init - 2)..init], len as u16);
-}
-
-fn write_single_subpacket<F: Fn(&mut Vec<u8>)>(packet: &mut Vec<u8>, tag: u8, write: F) {
-    packet.extend(&[0, tag]);
-    let init = packet.len() - 1;
-    write(packet);
-    let len = packet.len() - init;
-    assert!(len < 191);
-    packet[init - 1] = len as u8;
-}
-
 // Mainly this function parses the possible packet headers.
-// If the data begins with a valid public key packet using
+// If the data begins with a valid old public key packet using
 // anything but the indeterminate length header format, it
 // will return the data of that public key packet.
 fn find_public_key_packet(data: &[u8]) -> Option<(&[u8], usize)> {
@@ -290,29 +206,8 @@ fn find_public_key_packet(data: &[u8]) -> Option<(&[u8], usize)> {
         Some(&0x9a)  => {
             if data.len() < 5 { return None }
             let len = BigEndian::read_u32(&data[1..5]) as usize;
+            if len > u16::MAX as usize { return None }
             (5, len)
-        }
-        Some(&0xd8)  => {
-            if data.len() < 2 { return None }
-            match data[1] {
-                x @ 000 ... 192 => {
-                    let len = x as usize;
-                    (2, len)
-                }
-                x @ 192 ... 223 => {
-                    if data.len() < 3 { return None }
-                    let upper = (x - 192) as usize;
-                    let lower = data[2] as usize;
-                    let len = (upper << 8) + lower;
-                    (3, len)
-                }
-                255             => {
-                    if data.len() < 6 { return None }
-                    let len = BigEndian::read_u32(&data[2..6]) as usize;
-                    (6, len)
-                }
-                _               => return None
-            }
         }
         _           => return None
     };
@@ -321,30 +216,10 @@ fn find_public_key_packet(data: &[u8]) -> Option<(&[u8], usize)> {
     Some((&data[init..end], end))
 }
 
-fn bigendian_u32(data: u32) -> BigEndianU32 {
-    let mut out = BigEndianU32::default();
-    BigEndian::write_u32(&mut out, data);
-    out
-}
-
-fn bigendian_u16(data: u16) -> BigEndianU16 {
-    let mut out = BigEndianU16::default();
-    BigEndian::write_u16(&mut out, data);
-    out
-}
-
 fn fingerprint(key_packet: &[u8]) -> [u8; 20] {
     let mut hasher = Sha1::new();
     hasher.update(key_packet);
     hasher.digest().bytes()
-}
-
-fn write_mpi(data: &mut Vec<u8>, mpi: &[u8]) {
-    assert!(mpi.len() < (u16::MAX / 8) as usize);
-    assert!(mpi.len() > 0);
-    let len = bigendian_u16((mpi.len() * 8 - (mpi[0].leading_zeros() as usize)) as u16);
-    data.extend(&len);
-    data.extend(mpi);
 }
 
 fn is_ed25519_valid(packet: &[u8]) -> bool {
