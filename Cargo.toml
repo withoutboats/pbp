@@ -23,4 +23,3 @@ dalek = ["ed25519-dalek"]
 
 [dev-dependencies]
 rand = "0.3.18"
-git2 = "0.6.11"
