@@ -12,6 +12,8 @@ use packet::*;
 use {Fingerprint, Signature};
 use PgpError;
 
+/// The valid types of OpenPGP signatures.
+#[allow(missing_docs)]
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum SigType {
     BinaryDocument          = 0x00,
@@ -31,17 +33,31 @@ pub enum SigType {
     ThirdPartyConfirmation  = 0x50,
 }
 
+/// A subpacket to be hashed into the signed data.
+/// 
+/// See RFC 4880 for more information.
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct SubPacket<'a> {
     pub tag: u8,
     pub data: &'a [u8],
 }
 
+/// An OpenPGP formatted ed25519 signature.
 pub struct PgpSig {
     data: Vec<u8>,
 }
 
 impl PgpSig {
+    /// Construct a new PGP signature.
+    ///
+    /// This will construct a valid OpenPGP signature using the ed25519
+    /// signing algorithm & SHA-256 hashing algorithm. It will contain
+    /// these hashed subpackets:
+    ///  - A version 4 key fingerprint
+    ///  - A timestamp
+    ///  - Whatever subpackets you pass as arguments
+    ///
+    /// It will contain the key id as an unhashed subpacket.
     pub fn new<Sha256, F>(
         data: &[u8],
         fingerprint: Fingerprint,
@@ -103,6 +119,10 @@ impl PgpSig {
         PgpSig { data }
     }
 
+    /// Parse an OpenPGP signature from binary data.
+    ///
+    /// This must be an ed25519 signature using SHA-256 for hashing,
+    /// and it must be in the subset of OpenPGP supported by this library.
     pub fn from_bytes(bytes: &[u8]) -> Result<PgpSig, PgpError> {
         // TODO: convert to three byte header
         let (data, packet) = find_signature_packet(bytes)?;
@@ -111,20 +131,24 @@ impl PgpSig {
         Ok(PgpSig { data })
     }
 
+    /// Parse an OpenPGP signature from ASCII armored data.
     pub fn from_ascii_armor(string: &str) -> Result<PgpSig, PgpError> {
         let data = remove_ascii_armor(string)?;
         PgpSig::from_bytes(&data)
     }
 
+    /// Get the binary representation of this signature.
     pub fn as_bytes(&self) -> &[u8] {
         &self.data
     }
 
+    /// Get the portion of this signature hashed into the signed data.
     pub fn hashed_section(&self) -> &[u8] {
         let subpackets_len = BigEndian::read_u16(&self.data[7..9]) as usize;
         &self.data[3..(subpackets_len + 9)]
     }
 
+    /// Get the actual ed25519 signature contained.
     pub fn signature(&self) -> Signature {
         let init = self.data.len() - 68;
         let sig_data = &self.data[init..];
@@ -134,12 +158,14 @@ impl PgpSig {
         sig
     }
 
+    /// Get the fingerprint of the public key which made this signature.
     pub fn fingerprint(&self) -> Fingerprint {
         let mut fingerprint = [0; 20];
         fingerprint.clone_from_slice(&self.data[10..30]);
         fingerprint
     }
 
+    /// Get the type of this signature.
     pub fn sig_type(&self) -> SigType {
         match self.data[4] {
             0x00 => SigType::BinaryDocument,
