@@ -2,8 +2,10 @@ use std::fmt::{self, Display};
 use std::u16;
 
 use byteorder::{ByteOrder, BigEndian};
-use digest::{Input, FixedOutput};
-use sha2::Sha256;
+use digest::Digest;
+use typenum::U32;
+#[cfg(feature = "dalek")]
+use typenum::U64;
 
 use ascii_armor::{ascii_armor, remove_ascii_armor};
 use packet::*;
@@ -39,14 +41,16 @@ pub struct PgpSig {
 }
 
 impl PgpSig {
-    pub fn new<F>(
+    pub fn new<Sha256, F>(
         data: &[u8],
         fingerprint: Fingerprint,
         sig_type: SigType,
         subpackets: &[SubPacket],
         sign: F
     ) -> PgpSig
-        where F: Fn(&[u8]) -> Signature,
+        where
+            Sha256: Digest<OutputSize = U32>,
+            F: Fn(&[u8]) -> Signature,
     {
         let data = prepare_packet(2, |packet| {
             packet.push(4);                 // version number
@@ -156,8 +160,10 @@ impl PgpSig {
         }
     }
 
-    pub fn verify<F>(&self, data: &[u8], verify: F) -> bool
-        where F: Fn(&[u8], Signature) -> bool,
+    pub fn verify<Sha256, F>(&self, data: &[u8], verify: F) -> bool
+        where
+            Sha256: Digest<OutputSize = U32>,
+            F: Fn(&[u8], Signature) -> bool,
     {
         let hash = {
             let mut hasher = Sha256::default();
@@ -177,14 +183,17 @@ impl PgpSig {
     }
 
     #[cfg(feature = "dalek")]
-    pub fn from_dalek(
+    pub fn from_dalek<Sha256, Sha512>(
         keypair: &::dalek::Keypair,
         data: &[u8],
         fingerprint: Fingerprint,
         sig_type: SigType
-    ) -> PgpSig {
-        PgpSig::new(data, fingerprint, sig_type, &[], |data| {
-            use sha2::Sha512;
+    ) -> PgpSig 
+    where
+        Sha256: Digest<OutputSize = U32>,
+        Sha512: Digest<OutputSize = U64>,
+    {
+        PgpSig::new::<Sha256, _>(data, fingerprint, sig_type, &[], |data| {
             keypair.sign::<Sha512>(data).to_bytes()
         })
     }
@@ -195,9 +204,12 @@ impl PgpSig {
     }
 
     #[cfg(feature = "dalek")]
-    pub fn verify_dalek(&self, data: &[u8], key: &::dalek::PublicKey) -> bool {
-        self.verify(data, |data, signature| {
-            use sha2::Sha512;
+    pub fn verify_dalek<Sha256, Sha512>(&self, data: &[u8], key: &::dalek::PublicKey) -> bool
+    where
+        Sha256: Digest<OutputSize = U32>,
+        Sha512: Digest<OutputSize = U64>,
+    {
+        self.verify::<Sha256, _>(data, |data, signature| {
             let sig = ::dalek::Signature::from_bytes(&signature).unwrap();
             key.verify::<Sha512>(data, &sig)
         })

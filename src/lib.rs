@@ -10,7 +10,7 @@ extern crate base64;
 extern crate byteorder;
 extern crate digest;
 extern crate sha1;
-extern crate sha2;
+extern crate typenum;
 
 #[cfg(feature = "dalek")]
 extern crate ed25519_dalek as dalek;

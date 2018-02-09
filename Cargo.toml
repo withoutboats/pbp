@@ -12,7 +12,7 @@ base64 = "0.8.0"
 byteorder = "1.1.0"
 digest = "0.6.2"
 sha1 = "0.2.0"
-sha2 = "0.6.0"
+typenum = "1.9.0"
 
 [dependencies.ed25519-dalek]
 version = "0.5.0"
@@ -23,3 +23,4 @@ dalek = ["ed25519-dalek"]
 
 [dev-dependencies]
 rand = "0.3.18"
+sha2 = "0.6.0"

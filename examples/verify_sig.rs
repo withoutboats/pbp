@@ -1,12 +1,13 @@
 #![feature(fs_read_write)]
 
 extern crate pbp;
-extern crate git2;
+extern crate sha2;
 
 use std::env;
 use std::fs;
 use std::path::PathBuf;
 
+use sha2::{Sha256, Sha512};
 use pbp::{PgpKey, PgpSig};
 
 fn main() {
@@ -20,7 +21,7 @@ fn main() {
     let sig = PgpSig::from_ascii_armor(&sig).unwrap();
     let key = PgpKey::from_ascii_armor(&key).unwrap();
 
-    if sig.verify_dalek(data.as_bytes(), &key.to_dalek().unwrap()) {
+    if sig.verify_dalek::<Sha256, Sha512>(data.as_bytes(), &key.to_dalek().unwrap()) {
         println!("Verified signature.");
     } else {
         println!("Could not verify signature.");

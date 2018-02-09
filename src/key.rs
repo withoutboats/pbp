@@ -3,7 +3,11 @@ use std::ops::Range;
 use std::u16;
 
 use byteorder::{ByteOrder, BigEndian};
+use digest::Digest;
 use sha1::Sha1;
+use typenum::U32;
+#[cfg(feature = "dalek")]
+use typenum::U64;
 
 use ascii_armor::{ascii_armor, remove_ascii_armor};
 use packet::*;
@@ -55,12 +59,13 @@ impl PgpKey {
     ///
     /// This will panic if your key is not 32 bits of data. It will not
     /// otherwise verify that your key is a valid ed25519 key.
-    pub fn new<F>(
+    pub fn new<Sha256, F>(
         key: &[u8],
         user_id: &str,
         sign: F,
     ) -> PgpKey where
-        F: Fn(&[u8]) -> Signature
+        Sha256: Digest<OutputSize = U32>,
+        F: Fn(&[u8]) -> Signature,
     {
         assert!(key.len() == 32);
 
@@ -78,7 +83,7 @@ impl PgpKey {
             data
         };
 
-        let signature_packet = PgpSig::new(
+        let signature_packet = PgpSig::new::<Sha256, _>(
             &sig_data,
             fingerprint,
             SigType::PositiveCertification,
@@ -141,9 +146,12 @@ impl PgpKey {
 
     #[cfg(feature = "dalek")]
     /// Create a PgpKey from a dalek Keypair and a user_id string.
-    pub fn from_dalek(keypair: &::dalek::Keypair, user_id: &str) -> PgpKey {
-        PgpKey::new(keypair.public.as_bytes(), user_id, |data| {
-            use sha2::Sha512;
+    pub fn from_dalek<Sha256, Sha512>(keypair: &::dalek::Keypair, user_id: &str) -> PgpKey
+    where
+        Sha256: Digest<OutputSize = U32>,
+        Sha512: Digest<OutputSize = U64>,
+    {
+        PgpKey::new::<Sha256, _>(keypair.public.as_bytes(), user_id, |data| {
             keypair.sign::<Sha512>(data).to_bytes()
         })
     }
