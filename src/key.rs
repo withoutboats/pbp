@@ -14,6 +14,7 @@ use packet::*;
 
 use {Fingerprint, Signature};
 use {PgpSig, SubPacket, SigType};
+use PgpError;
 
 // curve identifier (curve25519)
 const CURVE: &[u8] = &[
@@ -106,26 +107,28 @@ impl PgpKey {
     ///
     /// As a result, a key constructed this way many not successfully import
     /// into an OpenPGP implementation like gpg.
-    pub fn from_bytes(bytes: &[u8]) -> Option<PgpKey> {
-        if let Some((packet_data, end)) = find_public_key_packet(bytes) {
-            // Validate that this is a version 4 curve25519 EdDSA key.
-            if !is_ed25519_valid(packet_data) { return None }
-            
-            // convert public key packet to the old style header,
-            // two byte length. All methods on PgpKey assume the
-            // public key is in that format (e.g. the fingerprint
-            // method).
-            let data = if bytes[0] != 0x99 { 
-                let mut packet = prepare_packet(6, |packet| packet.extend(packet_data));
-                packet.extend(&bytes[end..]);
-                packet
-            } else { bytes.to_owned() };
+    pub fn from_bytes(bytes: &[u8]) -> Result<PgpKey, PgpError> {
+        let (packet_data, end) = find_public_key_packet(bytes)?;
 
-            Some(PgpKey { data })
-        } else { None } 
+        // Validate that this is a version 4 curve25519 EdDSA key.
+        if !is_ed25519_valid(packet_data) {
+            return Err(PgpError::UnsupportedPublicKeyPacket);
+        }
+        
+        // convert public key packet to the old style header,
+        // two byte length. All methods on PgpKey assume the
+        // public key is in that format (e.g. the fingerprint
+        // method).
+        let data = if bytes[0] != 0x99 { 
+            let mut packet = prepare_packet(6, |packet| packet.extend(packet_data));
+            packet.extend(&bytes[end..]);
+            packet
+        } else { bytes.to_owned() };
+
+        Ok(PgpKey { data })
     }
 
-    pub fn from_ascii_armor(string: &str) -> Option<PgpKey> {
+    pub fn from_ascii_armor(string: &str) -> Result<PgpKey, PgpError> {
         let data = remove_ascii_armor(string)?;
         PgpKey::from_bytes(&data)
     }
@@ -199,29 +202,29 @@ fn write_user_id_packet(data: &mut Vec<u8>, user_id: &str) -> Range<usize> {
 // If the data begins with a valid old public key packet using
 // anything but the indeterminate length header format, it
 // will return the data of that public key packet.
-fn find_public_key_packet(data: &[u8]) -> Option<(&[u8], usize)> {
+fn find_public_key_packet(data: &[u8]) -> Result<(&[u8], usize), PgpError> {
     let (init, len) = match data.first() {
         Some(&0x98)  => {
-            if data.len() < 2 { return None }
+            if data.len() < 2 { return Err(PgpError::InvalidPacketHeader) }
             let len = data[1] as usize;
             (2, len)
         }
         Some(&0x99)  => {
-            if data.len() < 3 { return None }
+            if data.len() < 3 { return Err(PgpError::InvalidPacketHeader) }
             let len = BigEndian::read_u16(&data[1..3]) as usize;
             (3, len)
         }
         Some(&0x9a)  => {
-            if data.len() < 5 { return None }
+            if data.len() < 5 { return Err(PgpError::InvalidPacketHeader) }
             let len = BigEndian::read_u32(&data[1..5]) as usize;
-            if len > u16::MAX as usize { return None }
+            if len > u16::MAX as usize { return Err(PgpError::UnsupportedPacketLength) }
             (5, len)
         }
-        _           => return None
+        _           => return Err(PgpError::UnsupportedPacketLength)
     };
     let end = init + len;
-    if data.len() < end { return None }
-    Some((&data[init..end], end))
+    if data.len() < end { return Err(PgpError::InvalidPacketHeader) }
+    Ok((&data[init..end], end))
 }
 
 fn fingerprint(key_packet: &[u8]) -> [u8; 20] {

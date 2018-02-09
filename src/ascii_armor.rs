@@ -3,18 +3,20 @@ use std::fmt;
 use base64;
 use byteorder::{BigEndian, ByteOrder};
 
-pub fn remove_ascii_armor(s: &str) -> Option<Vec<u8>> {
+use PgpError;
+
+pub fn remove_ascii_armor(s: &str) -> Result<Vec<u8>, PgpError> {
     let lines: Vec<&str> = s.lines().map(|s| s.trim()).collect();
-    let first_line = lines.first()?;
+    let first_line = lines.first().ok_or(PgpError::InvalidAsciiArmor)?;
     if !first_line.starts_with("-----") || !first_line.ends_with("-----") {
-        return None
+        return Err(PgpError::InvalidAsciiArmor)
     }
-    let last_line = lines.last()?;
+    let last_line = lines.last().ok_or(PgpError::InvalidAsciiArmor)?;
     if !last_line.starts_with("-----") || !last_line.ends_with("-----") {
-        return None
+        return Err(PgpError::InvalidAsciiArmor)
     }
 
-    base64::decode(&lines[2..lines.len() - 2].concat()).ok()
+    base64::decode(&lines[2..lines.len() - 2].concat()).map_err(|_| PgpError::InvalidAsciiArmor)
     // TODO checksum?
 }
 

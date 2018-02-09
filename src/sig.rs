@@ -10,6 +10,7 @@ use typenum::U64;
 use ascii_armor::{ascii_armor, remove_ascii_armor};
 use packet::*;
 use {Fingerprint, Signature};
+use PgpError;
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum SigType {
@@ -102,15 +103,15 @@ impl PgpSig {
         PgpSig { data }
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> Option<PgpSig> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<PgpSig, PgpError> {
         // TODO: convert to three byte header
         let (data, packet) = find_signature_packet(bytes)?;
-        if !has_correct_structure(packet) { return None }
-        if !has_correct_hashed_subpackets(packet) { return None }
-        Some(PgpSig { data })
+        has_correct_structure(packet)?;
+        has_correct_hashed_subpackets(packet)?;
+        Ok(PgpSig { data })
     }
 
-    pub fn from_ascii_armor(string: &str) -> Option<PgpSig> {
+    pub fn from_ascii_armor(string: &str) -> Result<PgpSig, PgpError> {
         let data = remove_ascii_armor(string)?;
         PgpSig::from_bytes(&data)
     }
@@ -227,32 +228,34 @@ impl Display for PgpSig {
     }
 }
 
-fn find_signature_packet(data: &[u8]) -> Option<(Vec<u8>, &[u8])> {
+fn find_signature_packet(data: &[u8]) -> Result<(Vec<u8>, &[u8]), PgpError> {
     let (init, len) = match data.first() {
         Some(&0x88)  => {
-            if data.len() < 2 { return None }
+            if data.len() < 2 { return Err(PgpError::InvalidPacketHeader) }
             (2, data[1] as usize)
         }
         Some(&0x89)  => {
-            if data.len() < 3 { return None }
+            if data.len() < 3 { return Err(PgpError::InvalidPacketHeader) }
             let len = BigEndian::read_u16(&data[1..3]);
             (3, len as usize)
         }
         Some(&0x8a)  => {
-            if data.len() < 5 { return None }
+            if data.len() < 5 { return Err(PgpError::InvalidPacketHeader) }
             let len = BigEndian::read_u32(&data[1..5]);
-            if len > u16::MAX as u32 { return None }
+            if len > u16::MAX as u32 { return Err(PgpError::UnsupportedPacketLength) }
             (5, len as usize)
         }
-        _            => return None,
+        _            => return Err(PgpError::UnsupportedPacketLength),
     };
 
-    if data.len() < init + len { return None }
+    if data.len() < init + len {
+        return Err(PgpError::InvalidPacketHeader)
+    }
 
     let packet = &data[init..][..len];
 
     if init == 3 {
-        Some((data.to_owned(), packet))
+        Ok((data.to_owned(), packet))
     } else {
         let mut vec = Vec::with_capacity(3 + len);
         let len = bigendian_u16(len as u16);
@@ -260,27 +263,42 @@ fn find_signature_packet(data: &[u8]) -> Option<(Vec<u8>, &[u8])> {
         vec.push(len[0]);
         vec.push(len[1]);
         vec.extend(packet.iter().cloned());
-        Some((vec, packet))
+        Ok((vec, packet))
     }
 }
 
-fn has_correct_structure(packet: &[u8]) -> bool {
-    if packet.len() < 6 { return false }
+fn has_correct_structure(packet: &[u8]) -> Result<(), PgpError> {
+    if packet.len() < 6 {
+        return Err(PgpError::UnsupportedSignaturePacket)
+    }
 
     if !(packet[0] == 04 && packet[2] == 22 && packet[3] == 08) {
-        return false
+        return Err(PgpError::UnsupportedSignaturePacket)
     }
 
     let hashed_len = BigEndian::read_u16(&packet[4..6]) as usize;
-    if packet.len() < hashed_len + 8 { return false }
+    if packet.len() < hashed_len + 8 {
+        return Err(PgpError::UnsupportedSignaturePacket)
+    }
+
     let unhashed_len = BigEndian::read_u16(&packet[(hashed_len + 6)..][..2]) as usize;
-    packet.len() == unhashed_len + hashed_len + 78
+    if packet.len() != unhashed_len + hashed_len + 78 {
+        return Err(PgpError::UnsupportedSignaturePacket)
+    }
+
+    Ok(())
 }
 
-fn has_correct_hashed_subpackets(packet: &[u8]) -> bool {
+fn has_correct_hashed_subpackets(packet: &[u8]) -> Result<(), PgpError> {
     let hashed_len = BigEndian::read_u16(&packet[4..6]) as usize;
-    if hashed_len < 23 { return false }
+    if hashed_len < 23 {
+        return Err(PgpError::MissingFingerprintSubpacket)
+    }
 
     // check that the first subpacket is a fingerprint subpacket
-    packet[6] == 22 && packet[7] == 33 && packet[8] == 4
+    if !(packet[6] == 22 && packet[7] == 33 && packet[8] == 4) {
+        return Err(PgpError::MissingFingerprintSubpacket)
+    }
+
+    Ok(())
 }
