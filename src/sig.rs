@@ -187,7 +187,7 @@ impl PgpSig {
         }
     }
 
-    pub fn verify<Sha256, F1, F2>(&self, data: &[u8], hash: F1, verify: F2) -> bool
+    pub fn verify<Sha256, F1, F2>(&self, hash: F1, verify: F2) -> bool
         where
             Sha256: Digest<OutputSize = U32>,
             F1: FnOnce(&mut Sha256),
@@ -197,7 +197,6 @@ impl PgpSig {
             let mut hasher = Sha256::default();
 
             hash(&mut hasher);
-            hasher.process(data);
 
             let hashed_section = self.hashed_section();
             hasher.process(hashed_section);
@@ -239,7 +238,7 @@ impl PgpSig {
         Sha512: Digest<OutputSize = U64>,
         F: FnOnce(&mut Sha256),
     {
-        self.verify::<Sha256, _>(input, |data, signature| {
+        self.verify::<Sha256, _, _>(input, |data, signature| {
             let sig = ::dalek::Signature::from_bytes(&signature).unwrap();
             key.verify::<Sha512>(data, &sig)
         })
