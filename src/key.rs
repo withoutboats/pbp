@@ -12,7 +12,7 @@ use typenum::U64;
 use ascii_armor::{ascii_armor, remove_ascii_armor};
 use packet::*;
 
-use {Fingerprint, Signature};
+use {Fingerprint, Signature, KeyFlags};
 use {PgpSig, SubPacket, SigType};
 use PgpError;
 
@@ -62,6 +62,7 @@ impl PgpKey {
     /// otherwise verify that your key is a valid ed25519 key.
     pub fn new<Sha256, F>(
         key: &[u8],
+        flags: KeyFlags,
         user_id: &str,
         sign: F,
     ) -> PgpKey where
@@ -88,7 +89,7 @@ impl PgpKey {
             &sig_data,
             fingerprint,
             SigType::PositiveCertification,
-            &[SubPacket { tag: 27, data: &[0] }],
+            &[SubPacket { tag: 27, data: &[flags.bits()] }],
             sign,
         );
         
@@ -149,12 +150,12 @@ impl PgpKey {
 
     #[cfg(feature = "dalek")]
     /// Create a PgpKey from a dalek Keypair and a user_id string.
-    pub fn from_dalek<Sha256, Sha512>(keypair: &::dalek::Keypair, user_id: &str) -> PgpKey
+    pub fn from_dalek<Sha256, Sha512>(keypair: &::dalek::Keypair, flags: KeyFlags, user_id: &str) -> PgpKey
     where
         Sha256: Digest<OutputSize = U32>,
         Sha512: Digest<OutputSize = U64>,
     {
-        PgpKey::new::<Sha256, _>(keypair.public.as_bytes(), user_id, |data| {
+        PgpKey::new::<Sha256, _>(keypair.public.as_bytes(), flags, user_id, |data| {
             keypair.sign::<Sha512>(data).to_bytes()
         })
     }

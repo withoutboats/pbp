@@ -13,6 +13,7 @@ extern crate sha1;
 extern crate typenum;
 
 #[macro_use] extern crate failure;
+#[macro_use] extern crate bitflags;
 
 #[cfg(feature = "dalek")]
 extern crate ed25519_dalek as dalek;
@@ -30,6 +31,17 @@ pub use sig::{PgpSig, SubPacket, SigType};
 pub type Fingerprint = [u8; 20];
 /// An ed25519 signature.
 pub type Signature = [u8; 64];
+
+bitflags! {
+    pub struct KeyFlags: u8 {
+        const NONE              = 0x00;
+        const CERTIFY           = 0x01;
+        const SIGN              = 0x02;
+        const ENCRYPT_COMS      = 0x04;
+        const ENCRYPT_STORAGE   = 0x08;
+        const AUTHENTICATION    = 0x20;
+    }
+}
 
 /// An error returned while attempting to parse a PGP signature or public key.
 #[derive(Fail, Debug)]

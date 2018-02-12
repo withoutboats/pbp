@@ -6,12 +6,12 @@ extern crate pbp;
 use rand::OsRng;
 use sha2::{Sha256, Sha512};
 use dalek::Keypair;
-use pbp::PgpKey;
+use pbp::{PgpKey, KeyFlags};
 
 fn main() {
     let mut cspring = OsRng::new().unwrap();
     let keypair = Keypair::generate::<Sha512>(&mut cspring);
 
-    let key = PgpKey::from_dalek::<Sha256, Sha512>(&keypair, "withoutboats");
+    let key = PgpKey::from_dalek::<Sha256, Sha512>(&keypair, KeyFlags::NONE, "withoutboats");
     println!("{}", key);
 }
