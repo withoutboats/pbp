@@ -130,7 +130,7 @@ impl PgpKey {
     }
 
     pub fn from_ascii_armor(string: &str) -> Result<PgpKey, PgpError> {
-        let data = remove_ascii_armor(string)?;
+        let data = remove_ascii_armor(string, "BEGIN PGP PUBLIC KEY BLOCK", "END PGP PUBLIC KEY BLOCK")?;
         PgpKey::from_bytes(&data)
     }
 

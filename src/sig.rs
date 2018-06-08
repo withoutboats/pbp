@@ -133,7 +133,7 @@ impl PgpSig {
 
     /// Parse an OpenPGP signature from ASCII armored data.
     pub fn from_ascii_armor(string: &str) -> Result<PgpSig, PgpError> {
-        let data = remove_ascii_armor(string)?;
+        let data = remove_ascii_armor(string, "BEGIN PGP SIGNATURE", "END PGP SIGNATURE")?;
         PgpSig::from_bytes(&data)
     }
 
