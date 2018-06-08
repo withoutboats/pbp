@@ -1,6 +1,6 @@
 [package]
 authors = ["Without Boats <boats@mozilla.com>"]
-description = "Generate ed25519 OpenPGP keys."
+description = "bridge non-PGP system to PGP data format"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 name = "pbp"

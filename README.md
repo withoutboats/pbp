@@ -1,6 +1,8 @@
 # pbp - Pretty Bad Protocol
 
-This crate lets you print OpenPGP formatted public keys from ed25519 keys.
+This crate lets you generate OpenPGP datagrams from ed25519 keys and
+signatures; it is intended to bridge from a non-PGP system to a transport
+medium that expects PGP data.
 
 ```rust
 fn print_key(keypair: KeyPair) {
