@@ -1,10 +1,13 @@
-//! This library implements a conversion from an ed25519 public key to a valid
-//! OpenPGP public key.
+//! This library is designed to integrate non-PGP generated and verified keys
+//! and signatures with channels that expect PGP data. It specifically only
+//! supports the ed25519 signature scheme.
 //!
-//! This library is intended to be used for transmiting ed25519 public keys
-//! through mediums which are designed to accept OpenPGP keys but not other
-//! kinds of data.
-// #![deny(missing_docs)]
+//! Sometimes you want to be able to sign data, and the only reasonable channel
+//! to transmit signatures and public keys available to you expects them to be
+//! PGP formatted. If you don't want to use a heavyweight dependency like gpg,
+//! this library supports only the minimal necessary components of the PGP
+//! format to transmit your keys and signatures.
+#![deny(missing_docs, missing_debug_implementations)]
 
 extern crate base64;
 extern crate byteorder;
@@ -33,12 +36,19 @@ pub type Fingerprint = [u8; 20];
 pub type Signature = [u8; 64];
 
 bitflags! {
+    /// The key flags assigned to this key.
     pub struct KeyFlags: u8 {
+        /// No key flags.
         const NONE              = 0x00;
+        /// The Certify flag.
         const CERTIFY           = 0x01;
+        /// The Sign flag.
         const SIGN              = 0x02;
+        /// The Encrypt Communication flag.
         const ENCRYPT_COMS      = 0x04;
+        /// The Encrypt Storage flag.
         const ENCRYPT_STORAGE   = 0x08;
+        /// The Authentication flag.
         const AUTHENTICATION    = 0x20;
     }
 }

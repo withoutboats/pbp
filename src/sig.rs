@@ -38,9 +38,11 @@ pub enum SigType {
 /// A subpacket to be hashed into the signed data.
 /// 
 /// See RFC 4880 for more information.
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Debug)]
 pub struct SubPacket<'a> {
+    /// The tag for this subpacket.
     pub tag: u8,
+    /// The data in this subpacket.
     pub data: &'a [u8],
 }
 
