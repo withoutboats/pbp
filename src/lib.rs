@@ -65,3 +65,13 @@ pub enum PgpError {
     #[fail(display = "Unsupported form of public key packet")]
     UnsupportedPublicKeyPacket,
 }
+
+// Helper for writing base64 data
+struct Base64<'a>(&'a [u8]);
+
+impl<'a> std::fmt::Debug for Base64<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(&base64::encode(self.0))
+    }
+}
+

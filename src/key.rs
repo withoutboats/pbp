@@ -1,5 +1,6 @@
-use std::fmt::{self, Display};
+use std::fmt::{self, Display, Debug};
 use std::ops::Range;
+use std::str::FromStr;
 use std::u16;
 
 use byteorder::{ByteOrder, BigEndian};
@@ -10,6 +11,7 @@ use typenum::U32;
 use typenum::U64;
 
 use ascii_armor::{ascii_armor, remove_ascii_armor};
+use Base64;
 use packet::*;
 
 use {Fingerprint, Signature, KeyFlags};
@@ -51,10 +53,6 @@ impl PgpKey {
     /// private key paired with the public key. You are required to provide
     /// this so that you don't have to trust this library with direct access
     /// to the private key.
-    ///
-    /// A PgpKey constructed this way is likely to be importable to gpg,
-    /// though the private key associated with it has been given no privileges
-    /// to sign or encrypt data.
     ///
     /// # Warnings
     ///
@@ -129,16 +127,20 @@ impl PgpKey {
         Ok(PgpKey { data })
     }
 
+    /// Construct a PgpKey from an ASCII armored string.
     pub fn from_ascii_armor(string: &str) -> Result<PgpKey, PgpError> {
         let data = remove_ascii_armor(string, "BEGIN PGP PUBLIC KEY BLOCK", "END PGP PUBLIC KEY BLOCK")?;
         PgpKey::from_bytes(&data)
     }
 
     /// The ed25519 public key data contained in this key.
+    ///
+    /// This slice will be thirty-two bytes long.
     pub fn key_data(&self) -> &[u8] {
         &self.data[22..54]
     }
 
+    /// All of the bytes in this key (including PGP metadata).
     pub fn as_bytes(&self) -> &[u8] {
         &self.data[..]
     }
@@ -169,6 +171,12 @@ impl PgpKey {
     }
 }
 
+impl Debug for PgpKey {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("PgpKey").field("key", &Base64(&self.data[..])).finish()
+    }
+}
+
 impl Display for PgpKey {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         ascii_armor(
@@ -177,6 +185,13 @@ impl Display for PgpKey {
             &self.data[..],
             f,
         )
+    }
+}
+
+impl FromStr for PgpKey {
+    type Err = PgpError;
+    fn from_str(s: &str) -> Result<PgpKey, PgpError> {
+        PgpKey::from_ascii_armor(s)
     }
 }
 

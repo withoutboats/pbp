@@ -1,4 +1,5 @@
-use std::fmt::{self, Display};
+use std::fmt::{self, Display, Debug};
+use std::str::FromStr;
 use std::u16;
 
 use byteorder::{ByteOrder, BigEndian};
@@ -8,6 +9,7 @@ use typenum::U32;
 use typenum::U64;
 
 use ascii_armor::{ascii_armor, remove_ascii_armor};
+use Base64;
 use packet::*;
 use {Fingerprint, Signature};
 use PgpError;
@@ -187,7 +189,11 @@ impl PgpSig {
         }
     }
 
-    pub fn verify<Sha256, F1, F2>(&self, hash: F1, verify: F2) -> bool
+    /// Verify data against this signature.
+    ///
+    /// The data to be verified should be inputed by hashing it into the
+    /// SHA-256 hasher using the input function.
+    pub fn verify<Sha256, F1, F2>(&self, input: F1, verify: F2) -> bool
         where
             Sha256: Digest<OutputSize = U32>,
             F1: FnOnce(&mut Sha256),
@@ -196,7 +202,7 @@ impl PgpSig {
         let hash = {
             let mut hasher = Sha256::default();
 
-            hash(&mut hasher);
+            input(&mut hasher);
 
             let hashed_section = self.hashed_section();
             hasher.process(hashed_section);
@@ -245,6 +251,12 @@ impl PgpSig {
     }
 }
 
+impl Debug for PgpSig {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("PgpSig").field("key", &Base64(&self.data[..])).finish()
+    }
+}
+
 impl Display for PgpSig {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         ascii_armor(
@@ -253,6 +265,13 @@ impl Display for PgpSig {
             &self.data[..],
             f,
         )
+    }
+}
+
+impl FromStr for PgpSig {
+    type Err = PgpError;
+    fn from_str(s: &str) -> Result<PgpSig, PgpError> {
+        PgpSig::from_ascii_armor(s)
     }
 }
 
