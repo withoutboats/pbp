@@ -34,6 +34,7 @@ const CURVE: &[u8] = &[
 /// formatted key is expected.
 ///
 /// This type implements Display by ASCII armoring the public key data.
+#[derive(Eq, PartialEq, Hash)]
 pub struct PgpKey {
     data: Vec<u8>,
 }

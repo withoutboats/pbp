@@ -47,6 +47,7 @@ pub struct SubPacket<'a> {
 }
 
 /// An OpenPGP formatted ed25519 signature.
+#[derive(Eq, PartialEq, Hash)]
 pub struct PgpSig {
     data: Vec<u8>,
 }

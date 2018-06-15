@@ -4,7 +4,7 @@ description = "bridge non-PGP system to PGP data format"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 name = "pbp"
-version = "0.3.0"
+version = "0.3.1"
 repository = "https://github.com/withoutboats/pbp"
 
 [dependencies]
