@@ -219,6 +219,7 @@ impl PgpSig {
     }
 
     #[cfg(feature = "dalek")]
+    /// Convert this signature from an ed25519-dalek signature.
     pub fn from_dalek<Sha256, Sha512>(
         keypair: &::dalek::Keypair,
         data: &[u8],
@@ -235,11 +236,13 @@ impl PgpSig {
     }
 
     #[cfg(feature = "dalek")]
+    /// Convert this signature to an ed25519-dalek signature.
     pub fn to_dalek(&self) -> ::dalek::Signature {
         ::dalek::Signature::from_bytes(&self.signature()).unwrap()
     }
 
     #[cfg(feature = "dalek")]
+    /// Verify this signature against an ed25519-dalek public key.
     pub fn verify_dalek<Sha256, Sha512, F>(&self, key: &::dalek::PublicKey, input: F) -> bool
     where
         Sha256: Digest<OutputSize = U32>,
