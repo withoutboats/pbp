@@ -63,6 +63,7 @@ impl PgpKey {
         key: &[u8],
         flags: KeyFlags,
         user_id: &str,
+        unix_time: u32,
         sign: F,
     ) -> PgpKey where
         Sha256: Digest<OutputSize = U32>,
@@ -72,7 +73,7 @@ impl PgpKey {
 
         let mut data = Vec::with_capacity(user_id.len() + 180);
 
-        let key_packet_range = write_public_key_packet(&mut data, key);
+        let key_packet_range = write_public_key_packet(&mut data, key, unix_time);
         let fingerprint = fingerprint(&data[key_packet_range.clone()]);
         write_user_id_packet(&mut data, user_id);
 
@@ -88,7 +89,11 @@ impl PgpKey {
             &sig_data,
             fingerprint,
             SigType::PositiveCertification,
-            &[SubPacket { tag: 27, data: &[flags.bits()] }],
+            unix_time,
+            &[
+                SubPacket { tag: 27, data: &[flags.bits()] },
+                SubPacket { tag: 23, data: &[0x80] },
+            ],
             sign,
         );
         
@@ -153,12 +158,12 @@ impl PgpKey {
 
     #[cfg(feature = "dalek")]
     /// Create a PgpKey from a dalek Keypair and a user_id string.
-    pub fn from_dalek<Sha256, Sha512>(keypair: &::dalek::Keypair, flags: KeyFlags, user_id: &str) -> PgpKey
+    pub fn from_dalek<Sha256, Sha512>(keypair: &::dalek::Keypair, flags: KeyFlags, unix_time: u32, user_id: &str) -> PgpKey
     where
         Sha256: Digest<OutputSize = U32>,
         Sha512: Digest<OutputSize = U64>,
     {
-        PgpKey::new::<Sha256, _>(keypair.public.as_bytes(), flags, user_id, |data| {
+        PgpKey::new::<Sha256, _>(keypair.public.as_bytes(), flags, user_id, unix_time, |data| {
             keypair.sign::<Sha512>(data).to_bytes()
         })
     }
@@ -196,10 +201,10 @@ impl FromStr for PgpKey {
     }
 }
 
-fn write_public_key_packet(data: &mut Vec<u8>, key: &[u8]) -> Range<usize> {
+fn write_public_key_packet(data: &mut Vec<u8>, key: &[u8], unix_time: u32) -> Range<usize> {
     write_packet(data, 6, |packet| {
         packet.push(4); // packet version #4
-        packet.extend(&TIMESTAMP);
+        packet.extend(&bigendian_u32(unix_time));
         packet.push(22); // algorithm id #22 (edDSA)
 
         packet.extend(CURVE);

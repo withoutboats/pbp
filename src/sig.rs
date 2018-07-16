@@ -67,6 +67,7 @@ impl PgpSig {
         data: &[u8],
         fingerprint: Fingerprint,
         sig_type: SigType,
+        unix_time: u32,
         subpackets: &[SubPacket],
         sign: F
     ) -> PgpSig
@@ -87,8 +88,8 @@ impl PgpSig {
                     packet.extend(&fingerprint);
                 });
 
-                // fake timestamp
-                write_single_subpacket(hashed_subpackets, 2, |packet| packet.extend(&TIMESTAMP));
+                // timestamp
+                write_single_subpacket(hashed_subpackets, 2, |packet| packet.extend(&bigendian_u32(unix_time)));
 
                 for &SubPacket { tag, data } in subpackets {
                     write_single_subpacket(hashed_subpackets, tag, |packet| packet.extend(data));
@@ -225,13 +226,14 @@ impl PgpSig {
         keypair: &::dalek::Keypair,
         data: &[u8],
         fingerprint: Fingerprint,
-        sig_type: SigType
+        sig_type: SigType,
+        timestamp: u32,
     ) -> PgpSig 
     where
         Sha256: Digest<OutputSize = U32>,
         Sha512: Digest<OutputSize = U64>,
     {
-        PgpSig::new::<Sha256, _>(data, fingerprint, sig_type, &[], |data| {
+        PgpSig::new::<Sha256, _>(data, fingerprint, sig_type, timestamp, &[], |data| {
             keypair.sign::<Sha512>(data).to_bytes()
         })
     }

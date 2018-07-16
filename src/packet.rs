@@ -6,8 +6,6 @@ use byteorder::{ByteOrder, BigEndian};
 pub(crate) type BigEndianU32  = [u8; 4];
 pub(crate) type BigEndianU16  = [u8; 2];
 
-pub(crate) const TIMESTAMP: [u8; 4] = [0, 0, 0, 1];
-
 pub(crate) fn write_packet<F: Fn(&mut Vec<u8>)>(data: &mut Vec<u8>, tag: u8, write: F) -> Range<usize> {
     let init = data.len();
     let header_tag = (tag << 2) | 0b_1000_0001;
