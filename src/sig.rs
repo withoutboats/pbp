@@ -254,7 +254,7 @@ impl PgpSig {
     {
         self.verify::<Sha256, _, _>(input, |data, signature| {
             let sig = ::dalek::Signature::from_bytes(&signature).unwrap();
-            key.verify::<Sha512>(data, &sig)
+            key.verify::<Sha512>(data, &sig).is_ok()
         })
     }
 }

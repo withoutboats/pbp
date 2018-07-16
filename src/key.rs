@@ -172,7 +172,7 @@ impl PgpKey {
     /// Convert this key into a dalek PublicKey.
     ///
     /// This will validate that the key data is a correct ed25519 public key.
-    pub fn to_dalek(&self) -> Result<::dalek::PublicKey, ::dalek::DecodingError> {
+    pub fn to_dalek(&self) -> Result<::dalek::PublicKey, ::dalek::SignatureError> {
         ::dalek::PublicKey::from_bytes(self.key_data())
     }
 }

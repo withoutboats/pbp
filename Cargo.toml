@@ -17,12 +17,12 @@ failure = "0.1.1"
 bitflags = "1.0.1"
 
 [dependencies.ed25519-dalek]
-version = "0.6.2"
+version = "0.7.0"
 optional = true
 
 [features]
 dalek = ["ed25519-dalek"]
 
 [dev-dependencies]
-rand = "0.3.18"
+rand = "0.5.4"
 sha2 = "0.6.0"
