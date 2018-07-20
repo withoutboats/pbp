@@ -49,7 +49,7 @@ impl PgpKey {
     /// - A public key packet (formatted according to the "EdDSA for OpenPGP"
     ///   extension draft)
     /// - A user id (whatever string you pass as the user id argument)
-    /// - A self-signature, with key usage flags all set to null
+    /// - A self-signature
     ///
     /// The sign function must be a valid function for signing data with the
     /// private key paired with the public key. You are required to provide
