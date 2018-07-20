@@ -7,16 +7,17 @@ use byteorder::{ByteOrder, BigEndian};
 use digest::Digest;
 use sha1::Sha1;
 use typenum::U32;
-#[cfg(feature = "dalek")]
-use typenum::U64;
 
-use ascii_armor::{ascii_armor, remove_ascii_armor};
-use Base64;
-use packet::*;
+#[cfg(feature = "dalek")] use ed25519_dalek as dalek;
+#[cfg(feature = "dalek")] use typenum::U64;
 
-use {Fingerprint, Signature, KeyFlags};
-use {PgpSig, SubPacket, SigType};
-use PgpError;
+use crate::ascii_armor::{ascii_armor, remove_ascii_armor};
+use crate::Base64;
+use crate::packet::*;
+
+use crate::{Fingerprint, Signature, KeyFlags};
+use crate::{PgpSig, SubPacket, SigType};
+use crate::PgpError;
 
 // curve identifier (curve25519)
 const CURVE: &[u8] = &[
@@ -158,7 +159,7 @@ impl PgpKey {
 
     #[cfg(feature = "dalek")]
     /// Create a PgpKey from a dalek Keypair and a user_id string.
-    pub fn from_dalek<Sha256, Sha512>(keypair: &::dalek::Keypair, flags: KeyFlags, unix_time: u32, user_id: &str) -> PgpKey
+    pub fn from_dalek<Sha256, Sha512>(keypair: &dalek::Keypair, flags: KeyFlags, unix_time: u32, user_id: &str) -> PgpKey
     where
         Sha256: Digest<OutputSize = U32>,
         Sha512: Digest<OutputSize = U64>,
@@ -172,8 +173,8 @@ impl PgpKey {
     /// Convert this key into a dalek PublicKey.
     ///
     /// This will validate that the key data is a correct ed25519 public key.
-    pub fn to_dalek(&self) -> Result<::dalek::PublicKey, ::dalek::SignatureError> {
-        ::dalek::PublicKey::from_bytes(self.key_data())
+    pub fn to_dalek(&self) -> Result<dalek::PublicKey, dalek::SignatureError> {
+        dalek::PublicKey::from_bytes(self.key_data())
     }
 }
 

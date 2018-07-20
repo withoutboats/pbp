@@ -5,14 +5,15 @@ use std::u16;
 use byteorder::{ByteOrder, BigEndian};
 use digest::Digest;
 use typenum::U32;
-#[cfg(feature = "dalek")]
-use typenum::U64;
 
-use ascii_armor::{ascii_armor, remove_ascii_armor};
-use Base64;
-use packet::*;
-use {Fingerprint, Signature};
-use PgpError;
+#[cfg(feature = "dalek")] use ed25519_dalek as dalek;
+#[cfg(feature = "dalek")] use typenum::U64;
+
+use crate::ascii_armor::{ascii_armor, remove_ascii_armor};
+use crate::Base64;
+use crate::packet::*;
+use crate::{Fingerprint, Signature};
+use crate::PgpError;
 
 /// The valid types of OpenPGP signatures.
 #[allow(missing_docs)]
@@ -223,7 +224,7 @@ impl PgpSig {
     #[cfg(feature = "dalek")]
     /// Convert this signature from an ed25519-dalek signature.
     pub fn from_dalek<Sha256, Sha512>(
-        keypair: &::dalek::Keypair,
+        keypair: &dalek::Keypair,
         data: &[u8],
         fingerprint: Fingerprint,
         sig_type: SigType,
@@ -240,20 +241,20 @@ impl PgpSig {
 
     #[cfg(feature = "dalek")]
     /// Convert this signature to an ed25519-dalek signature.
-    pub fn to_dalek(&self) -> ::dalek::Signature {
-        ::dalek::Signature::from_bytes(&self.signature()).unwrap()
+    pub fn to_dalek(&self) -> dalek::Signature {
+        dalek::Signature::from_bytes(&self.signature()).unwrap()
     }
 
     #[cfg(feature = "dalek")]
     /// Verify this signature against an ed25519-dalek public key.
-    pub fn verify_dalek<Sha256, Sha512, F>(&self, key: &::dalek::PublicKey, input: F) -> bool
+    pub fn verify_dalek<Sha256, Sha512, F>(&self, key: &dalek::PublicKey, input: F) -> bool
     where
         Sha256: Digest<OutputSize = U32>,
         Sha512: Digest<OutputSize = U64>,
         F: FnOnce(&mut Sha256),
     {
         self.verify::<Sha256, _, _>(input, |data, signature| {
-            let sig = ::dalek::Signature::from_bytes(&signature).unwrap();
+            let sig = dalek::Signature::from_bytes(&signature).unwrap();
             key.verify::<Sha512>(data, &sig).is_ok()
         })
     }

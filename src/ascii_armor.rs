@@ -5,8 +5,8 @@ use std::fmt;
 use base64;
 use byteorder::{BigEndian, ByteOrder};
 
-use PgpError;
-use PgpError::InvalidAsciiArmor;
+use crate::PgpError;
+use crate::PgpError::InvalidAsciiArmor;
 
 impl From<base64::DecodeError> for PgpError {
     fn from(_: base64::DecodeError) -> PgpError {

@@ -7,13 +7,8 @@
 //! PGP formatted. If you don't want to use a heavyweight dependency like gpg,
 //! this library supports only the minimal necessary components of the PGP
 //! format to transmit your keys and signatures.
+#![feature(rust_2018_preview)]
 #![deny(missing_docs, missing_debug_implementations)]
-
-extern crate base64;
-extern crate byteorder;
-extern crate digest;
-extern crate sha1;
-extern crate typenum;
 
 #[macro_use] extern crate failure;
 #[macro_use] extern crate bitflags;
@@ -27,8 +22,8 @@ mod packet;
 mod key;
 mod sig;
 
-pub use key::PgpKey;
-pub use sig::{PgpSig, SubPacket, SigType};
+pub use crate::key::PgpKey;
+pub use crate::sig::{PgpSig, SubPacket, SigType};
 
 /// An OpenPGP public key fingerprint.
 pub type Fingerprint = [u8; 20];
